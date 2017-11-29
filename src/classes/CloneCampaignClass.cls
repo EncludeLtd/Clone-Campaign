@@ -1,11 +1,14 @@
 /*
     Author: Eamon Kelly, Enclude
     Purpose:  Clone a campaign, copying all the members that have a specific status 
+    Note that this does not copy the status over - the new campaign members get the default status
     Called from: CloneCampaign page
     Tested in: TestCloneCampaign
 */
 public with sharing class CloneCampaignClass 
 {
+	public class tooBigException extends Exception {}
+	
     Campaign campaignToClone;
     public CampaignMember cm {get;set;}
     List<CampaignMemberStatus> cmStatus {get;set;} 
@@ -60,22 +63,39 @@ public with sharing class CloneCampaignClass
         }
     }
     
-    public pageReference cloneCampaign ()
+    public Campaign prepareClone (Campaign campToClone)
     {
-        Campaign clone = new Campaign (Name=campaignToClone.Name + ' Copy');
+        Campaign clone = new Campaign (Name=(campToClone.Name + ' Copy').left(80));
         clone.IsActive = true;
         clone.ParentId = campaignToClone.id;
-        if (campaignToClone.CampaignMemberRecordTypeId != null) clone.CampaignMemberRecordTypeId = campaignToClone.CampaignMemberRecordTypeId;
-//        if (campaignToClone.RecordTypeId != null) clone.RecordTypeId = campaignToClone.RecordTypeId;
+        if (campaignToClone.CampaignMemberRecordTypeId != null) clone.CampaignMemberRecordTypeId = campToClone.CampaignMemberRecordTypeId;
 
         insert clone;
         
         copyCampaignMemberStatus (clone.Id);
+		return clone;    	
+    }
+    
+    public pageReference cloneCampaign ()
+    {
+    	Campaign clone = prepareClone (campaignToClone);
         
-        if (cm != null) cloneCampaignMembers (clone.Id);
-        
-        PageReference clonePage = new PageReference ('/' + clone.id);
-        return clonePage;
+        try
+        {
+	        if (cm != null) cloneCampaignMembers (clone.Id);
+	        
+	        PageReference clonePage = new PageReference ('/' + clone.id);
+	        return clonePage;
+        }
+        catch (Exception e)
+        {
+        	// Failed, so do it in batches
+       		CloneWithBatch cloneBatch = new CloneWithBatch (campaignToClone.Id, clone.Id, statusRequired);
+	   		Database.executeBatch(cloneBatch, 2000); 
+			ApexPages.Message myMsg = new ApexPages.Message(ApexPages.Severity.INFO, 'Cloning started, you will receive an email when it is finished');
+			ApexPages.addMessage(myMsg);
+			return null;
+        }
     }
     
     public List<CampaignMember> getCampaignMembers ()
@@ -103,11 +123,14 @@ public with sharing class CloneCampaignClass
     public void cloneCampaignMembers (ID campaignID)
     {
         List<CampaignMember> oldMembers = getCampaignMembers();
-        
-        List<CampaignMember> newMembers = new List<CampaignMember>();
-        for (CampaignMember oneMember: oldMembers)
-            newMembers.add (new CampaignMember (CampaignID=campaignID, ContactID=oneMember.ContactID));
-        if (newMembers.size()>0) insert newMembers;
+        if (oldMembers.size() > 9000) throw new tooBigException('Too many members');
+        else
+        {
+	        List<CampaignMember> newMembers = new List<CampaignMember>();
+	        for (CampaignMember oneMember: oldMembers)
+	            newMembers.add (new CampaignMember (CampaignID=campaignID, ContactID=oneMember.ContactID));
+	        if (newMembers.size()>0) insert newMembers;
+        }
     }
     
     public List<SelectOption> getCampaignStatusList() 

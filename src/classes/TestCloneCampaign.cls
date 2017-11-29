@@ -6,10 +6,9 @@
 @isTest
 private class TestCloneCampaign 
 {
-   public static testMethod void cloneCampaignTest ()
-   {
-//      ID accountRecordTypeId = Schema.SObjectType.Account.getRecordTypeInfosByName().get('Organization').getRecordTypeId();
-        Account self = new Account (Name='Self'); // , RecordTypeID=accountRecordTypeId);
+	@testSetup static void createData ()
+	{
+        Account self = new Account (Name='Self');
         insert self;
         Contact vol = new Contact (AccountID=self.id, FirstName = 'Test', LastName='Therapist');
         insert vol;
@@ -33,7 +32,12 @@ private class TestCloneCampaign
         CampaignMember cm3 = new CampaignMember (CampaignID=camp.id, ContactId=vol3.id);
         cm3.Status = 'Sent';
         insert cm3;
-        
+	}
+	
+	public static testMethod void cloneCampaignTest ()
+   	{
+    	Campaign camp = [select ID from Campaign limit 1];
+    	    
         ApexPages.StandardController CloneCampaignPage = new ApexPages.StandardController(camp);
         CloneCampaignClass cc = new CloneCampaignClass (CloneCampaignPage);
         
@@ -48,4 +52,19 @@ private class TestCloneCampaign
         
         cc.getCampaignStatusList();
     }
+    
+    public static testMethod void cloneCampaignBatchTest ()
+   	{
+    	Campaign campaignToClone = [select ID, Name from Campaign limit 1];
+        ApexPages.StandardController CloneCampaignPage = new ApexPages.StandardController(campaignToClone);
+        CloneCampaignClass cc = new CloneCampaignClass (CloneCampaignPage);
+
+    	String statusRequired = 'Responded';
+    	Campaign clone = cc.prepareClone (campaignToClone);
+    	
+    	test.startTest();
+    		CloneWithBatch cloneBatch = new CloneWithBatch (campaignToClone.Id, clone.Id, statusRequired);
+	   		Database.executeBatch(cloneBatch, 2000); 
+    	test.stopTest();
+   	}
 }
