@@ -28,5 +28,9 @@
         <members>*</members>
         <name>StaticResource</name>
     </types>
+    <types>
+        <members>Campaign.Clone_with_Members</members>
+        <name>WebLink</name>
+    </types>
     <version>38.0</version>
 </Package>
