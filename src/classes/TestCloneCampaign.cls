@@ -55,7 +55,7 @@ private class TestCloneCampaign
     
     public static testMethod void cloneCampaignBatchTest ()
    	{
-    	Campaign campaignToClone = [select ID, Name from Campaign limit 1];
+    	Campaign campaignToClone = [select ID, Name, Type, CampaignMemberRecordTypeId from Campaign limit 1];
         ApexPages.StandardController CloneCampaignPage = new ApexPages.StandardController(campaignToClone);
         CloneCampaignClass cc = new CloneCampaignClass (CloneCampaignPage);
 

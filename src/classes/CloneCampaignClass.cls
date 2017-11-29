@@ -16,7 +16,7 @@ public with sharing class CloneCampaignClass
     
     public CloneCampaignClass(ApexPages.StandardController controller) 
     {
-        campaignToClone = [select id, CampaignMemberRecordTypeId, Name, NumberOfContacts from Campaign where ID = :controller.getRecord().id];
+        campaignToClone = [select id, CampaignMemberRecordTypeId, Name, NumberOfContacts, Type from Campaign where ID = :controller.getRecord().id];
         
         cmStatus = [SELECT CampaignId, Id, Label, SortOrder, HasResponded, isDefault FROM CampaignMemberStatus where CampaignId = :campaignToClone.id];
         // use one of the campaign members as a template
@@ -46,20 +46,29 @@ public with sharing class CloneCampaignClass
     			system.debug ('Failed to delete status ' + oneStatus.Label + ': '+ e);
     		}
     	}
+    	// create a set of names left, so we don't recreate them
+    	set <String> statusNames = new set<String>();
+    	for (CampaignMemberStatus oneStatus : [SELECT Id, Label FROM CampaignMemberStatus where CampaignId = :clonedCampaign])
+		{
+			statusNames.add (oneStatus.Label);
+		}    	
         for (CampaignMemberStatus oneStatus: cmStatus)
         {
-            CampaignMemberStatus newStatus = oneStatus.clone();
-            newStatus.CampaignId = clonedCampaign;
-            newStatus.SortOrder = oneStatus.SortOrder;
-            newStatus.HasResponded = oneStatus.HasResponded;
-            try
-            {
-                insert newStatus;
-            }
-            catch (Exception e)
-            {
-                system.debug ('Failed to add CampaignMemberStatus ' + e);
-            }
+        	if (!statusNames.contains (oneStatus.Label))
+        	{
+	            CampaignMemberStatus newStatus = oneStatus.clone();
+	            newStatus.CampaignId = clonedCampaign;
+	            newStatus.SortOrder = oneStatus.SortOrder;
+	            newStatus.HasResponded = oneStatus.HasResponded;
+	            try
+	            {
+	                insert newStatus;
+	            }
+	            catch (Exception e)
+	            {
+	                system.debug ('Failed to add CampaignMemberStatus ' + e);
+	            }
+        	}
         }
     }
     
@@ -67,8 +76,9 @@ public with sharing class CloneCampaignClass
     {
         Campaign clone = new Campaign (Name=(campToClone.Name + ' Copy').left(80));
         clone.IsActive = true;
-        clone.ParentId = campaignToClone.id;
-        if (campaignToClone.CampaignMemberRecordTypeId != null) clone.CampaignMemberRecordTypeId = campToClone.CampaignMemberRecordTypeId;
+        clone.ParentId = campToClone.id;
+        clone.Type = campToClone.Type;
+        if (campToClone.CampaignMemberRecordTypeId != null) clone.CampaignMemberRecordTypeId = campToClone.CampaignMemberRecordTypeId;
 
         insert clone;
         
@@ -83,7 +93,6 @@ public with sharing class CloneCampaignClass
         try
         {
 	        if (cm != null) cloneCampaignMembers (clone.Id);
-	        
 	        PageReference clonePage = new PageReference ('/' + clone.id);
 	        return clonePage;
         }
@@ -109,7 +118,8 @@ public with sharing class CloneCampaignClass
             soql += ' and (';   
             if (statusRequired != null) soql += 'Status = \'' + statusRequired + '\'';
             soql += ')';
-        } 
+        }
+        soql += ' limit 9500'; 
         System.debug(soql);
         return (List<CampaignMember>)database.query(soql);
     }
