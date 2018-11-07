@@ -1,4 +1,4 @@
-<apex:page StandardController="Campaign" extensions="CloneCampaignClass">
+<apex:page StandardController="Campaign" extensions="CloneCampaignClass" lightningStylesheets="true" >
     <apex:pageMessages />
     <apex:form >
         <apex:pageBlock id="thePageBlock" title="Clone campaign {!campaign.Name}">
